@@ -25,14 +25,14 @@ Public domain.
 #include "global.h"
 #include "connectioninfo.h"
 #include "die.h"
+#include "str.h"
 #include "main.h"
-
-#define USAGE "usage: tinysshd [options] keydir"
 
 static unsigned int cryptotypeselected = sshcrypto_TYPENEWCRYPTO | sshcrypto_TYPEPQCRYPTO;
 static int flagverbose = 1;
 static int fdwd;
 static int flaglogger = 0;
+static int flagnoneauth = 0;
 
 static struct buf b1 = {global_bspace1, 0, sizeof global_bspace1};
 static struct buf b2 = {global_bspace2, 0, sizeof global_bspace2};
@@ -49,8 +49,12 @@ static void trigger(int x) {
     x = write(selfpipe[1], "", 1);
 }
 
+static char *tunnelip = 0;
+static char *tunnelport = 0;
+static const char *usageparams = 0;
+static long long binarynamelen = 0;
 
-int main_tinysshd(int argc, char **argv) {
+int main_tinysshd(int argc, char **argv, const char *binaryname) {
 
     char *x;
     const char *keydir = 0;
@@ -68,10 +72,19 @@ int main_tinysshd(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
     signal(SIGALRM, timeout);
 
-    log_init(0, "tinysshd", 0, 0);
+    binarynamelen = str_len(binaryname);
 
-    if (argc < 2) die_usage(USAGE);
-    if (!argv[0]) die_usage(USAGE);
+    if (str_equaln(binaryname, binarynamelen, "tinysshtunneld")) {
+        usageparams = "[options] keydir ip port";
+    }
+    else {
+        usageparams = "[options] keydir";
+    }
+
+    log_init(0, binaryname, 0, 0);
+
+    if (argc < 2) die_usage(binaryname, usageparams);
+    if (!argv[0]) die_usage(binaryname, usageparams);
     for (;;) {
         if (!argv[1]) break;
         if (argv[1][0] != '-') break;
@@ -95,12 +108,20 @@ int main_tinysshd(int argc, char **argv) {
                 if (argv[1]) { channel_subsystem_add(*++argv); break; }
             }
 
-            die_usage(USAGE);
+            die_usage(binaryname, usageparams);
         }
     }
-    keydir = *++argv; if (!keydir) die_usage(USAGE);
+    keydir = *++argv; if (!keydir) die_usage(binaryname, usageparams);
 
-    log_init(flagverbose, "tinysshd", 1, flaglogger);
+    log_init(flagverbose, binaryname, 1, flaglogger);
+
+    if (str_equaln(binaryname, binarynamelen, "tinysshtunneld")) {
+        /* XXX TODO: parse ip, port and reject invalid input*/
+        tunnelip = *++argv; if (!tunnelip) die_usage(binaryname, usageparams);
+        tunnelport = *++argv; if (!tunnelport) die_usage(binaryname, usageparams);
+        if (geteuid() == 0) die_fatal("rejecting to run under UID=0", 0, 0);
+        flagnoneauth = 1;
+    }
 
     connectioninfo(channel.localip, channel.localport, channel.remoteip, channel.remoteport);
     log_i4("connection from ", channel.remoteip, ":", channel.remoteport);
@@ -166,7 +187,7 @@ rekeying:
 
     /* authentication + authorization */
     if (packet.flagauthorized == 0) {
-        if (!packet_auth(&b1, &b2)) die_fatal("authentication failed", 0, 0);
+        if (!packet_auth(&b1, &b2, flagnoneauth)) die_fatal("authentication failed", 0, 0);
         packet.flagauthorized = 1;
     }
 
@@ -259,7 +280,7 @@ rekeying:
                     if (!packet_channel_open(&b1, &b2)) die_fatal("unable to open channel", 0, 0);
                     break;
                 case SSH_MSG_CHANNEL_REQUEST:
-                    if (!packet_channel_request(&b1, &b2)) die_fatal("unable to handle channel-request", 0, 0);
+                    if (!packet_channel_request(&b1, &b2, tunnelip, tunnelport)) die_fatal("unable to handle channel-request", 0, 0);
                     break;
                 case SSH_MSG_CHANNEL_DATA:
                     if (!packet_channel_recv_data(&b1)) die_fatal("unable to handle channel-data", 0, 0);

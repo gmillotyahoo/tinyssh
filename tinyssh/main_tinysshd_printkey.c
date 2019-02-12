@@ -20,18 +20,18 @@ static struct buf b1 = { global_bspace1, 0, sizeof global_bspace1 }; /* reusing 
 static struct buf b2 = { global_bspace2, 0, sizeof global_bspace2 }; /* reusing global buffer */
 static unsigned char pk[sshcrypto_sign_PUBLICKEYMAX];
 
-#define USAGE "usage: tinysshd-printkey keydir"
+#define USAGEPARAMS "keydir"
 
 
-int main_tinysshd_printkey(int argc, char **argv) {
+int main_tinysshd_printkey(int argc, char **argv, const char *binaryname) {
 
     char *x;
     long long i;
 
-    log_init(3, "tinysshd-printkey", 0, 0);
+    log_init(3, binaryname, 0, 0);
 
-    if (argc < 2) die_usage(USAGE);
-    if (!argv[0]) die_usage(USAGE);
+    if (argc < 2) die_usage(binaryname, USAGEPARAMS);
+    if (!argv[0]) die_usage(binaryname, USAGEPARAMS);
     for (;;) {
         if (!argv[1]) break;
         if (argv[1][0] != '-') break;
@@ -39,10 +39,10 @@ int main_tinysshd_printkey(int argc, char **argv) {
         if (x[0] == '-' && x[1] == 0) break;
         if (x[0] == '-' && x[1] == '-' && x[2] == 0) break;
         while (*++x) {
-            die_usage(USAGE);
+            die_usage(binaryname, USAGEPARAMS);
         }
     }
-    x = *++argv; if (!x) die_usage(USAGE);
+    x = *++argv; if (!x) die_usage(binaryname, USAGEPARAMS);
 
     if (chdir(x) == -1) die_fatal("unable to chdir to directory", x, 0);
 

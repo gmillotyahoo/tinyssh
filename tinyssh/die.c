@@ -2,9 +2,9 @@
 #include "log.h"
 #include "die.h"
 
-void die_usage(const char *x) {
+void die_usage(const char *x, const char *y) {
 
-    log_u1(x);
+    log_u4("usage: ", x, " ", y);
     global_die(100);
 }
 

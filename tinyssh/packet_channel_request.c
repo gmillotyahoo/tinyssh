@@ -13,7 +13,7 @@ Public domain.
 #include "packetparser.h"
 #include "packet.h"
 
-int packet_channel_request(struct buf *b1, struct buf *b2) {
+int packet_channel_request(struct buf *b1, struct buf *b2, char *tunnelip, char *tunnelport) {
 
     long long pos = 0;
     crypto_uint8 ch, wantreply;
@@ -48,6 +48,11 @@ int packet_channel_request(struct buf *b1, struct buf *b2) {
         buf_putnum8(b1, 0);
         p1[plen1] = 0;
 
+        if (tunnelip && tunnelport) {
+            log_d3("packet=SSH_MSG_CHANNEL_REQUEST, exec ", p1, ", rejected");
+            goto reject;
+        }
+
         if (!channel_exec(p1)) bug();
         log_d3("packet=SSH_MSG_CHANNEL_REQUEST, exec ", p1, ", accepted");
         goto accept;
@@ -67,6 +72,11 @@ int packet_channel_request(struct buf *b1, struct buf *b2) {
         pos = packetparser_end(b1->buf, b1->len, pos);
         buf_putnum8(b1, 0);
         p1[plen1] = 0;
+
+        if (tunnelip && tunnelport) {
+            log_d3("packet=SSH_MSG_CHANNEL_REQUEST, subsystem ", p1, ", rejected");
+            goto reject;
+        }
 
         p2 = channel_subsystem_get(p1);
         if (!p2) {
@@ -90,8 +100,20 @@ int packet_channel_request(struct buf *b1, struct buf *b2) {
 
         pos = packetparser_end(b1->buf, b1->len, pos);
 
-        if (!channel_exec(0)) bug();
-        log_d1("packet=SSH_MSG_CHANNEL_REQUEST, shell, accepted");
+        if (tunnelip && tunnelport) {
+            /* XXX hardcoded 'nc' */
+            buf_purge(b2);
+            buf_puts(b2, "nc ");
+            buf_puts(b2, tunnelip);
+            buf_puts(b2, " ");
+            buf_puts(b2, tunnelport);
+            if (!channel_exec((char *)b2->buf)) bug();
+            log_d3("packet=SSH_MSG_CHANNEL_REQUEST, tunnel ", (char *)b2->buf, ", accepted");
+        }
+        else {
+            if (!channel_exec(0)) bug();
+            log_d1("packet=SSH_MSG_CHANNEL_REQUEST, shell, accepted");
+        }
         goto accept;
     }
 

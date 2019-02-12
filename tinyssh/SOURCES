@@ -60,5 +60,6 @@ subprocess_sign
 tinysshd
 tinysshd-makekey
 tinysshd-printkey
+tinysshtunneld
 trymlock
 writeall

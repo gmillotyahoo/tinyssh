@@ -36,13 +36,16 @@ int main(int argc, char **argv) {
     xlen = str_len(x);
 
     if (str_equaln(x, xlen, "tinysshd-printkey")) {
-        return main_tinysshd_printkey(argc, argv);
+        return main_tinysshd_printkey(argc, argv, "tinysshd-printkey");
     }
     else if (str_equaln(x, xlen, "tinysshd-makekey")){
-        return main_tinysshd_makekey(argc, argv);
+        return main_tinysshd_makekey(argc, argv, "tinysshd-makekey");
+    }
+    else if (str_equaln(x, xlen, "tinysshtunneld")){
+        return main_tinysshd(argc, argv, "tinysshtunneld");
     }
     else {
-        return main_tinysshd(argc, argv);
+        return main_tinysshd(argc, argv, "tinysshd");
     }
 
     _exit(111);
